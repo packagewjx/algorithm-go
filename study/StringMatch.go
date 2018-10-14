@@ -96,53 +96,25 @@ func newBoyerMooreTable(pattern string) *boyermooreShiftTable {
 	table.goodSuffix = make([]int, len(pattern))
 	// 定义好后缀0为整条的长度
 	table.goodSuffix[0] = len(pattern)
-	//首先将字符串转过来，然后使用后缀搜索除去后缀之后的字符串即可，若搜索到，则放入goodSuffix(i)
-	// 若没有，则使用goodSuffix(i - 1)作为goodSuffix(i)
+	//将字符串转过来
 	reversePattern := reverseString(pattern)
 	for i := 1; i < len(pattern); i++ {
-		// 借用库函数来寻找第一个好后缀。index是找到的这个好后缀在整条模式字符串中，从后面开始数过来的下标值
-		if goodIndex := strings.Index(reversePattern[i:], reversePattern[:i]); goodIndex == -1 {
-			// 若没有找到，需要寻找短一点的好后缀的，在最前面是否出现
-			// 因为如果好后缀中的后面一部分在最前面出现了，就可能会有好后缀的另外一部分出现在整条模式字符串的前面
-			// 比如在好后缀长度i=3时，ABCBAB，好后缀BAB，但是其中AB在最前面出现了，那么AB前面的B也可能继续出现
-			// 因此这个好后缀移动是4。
+		// 如果刚好i-1移动的位置，在这个好后缀里面
+		// 此时我们需要比较，新加入的字符是不是匹配的
+		if i > 1 && len(pattern)-table.goodSuffix[i-1]-(i-1)-1 >= 0 && pattern[len(pattern)-(i-1)-1] == pattern[len(pattern)-table.goodSuffix[i-1]-(i-1)-1] {
+			// 如果匹配，则我们可以用上一个的值
+			table.goodSuffix[i] = table.goodSuffix[i-1]
 
-			// 首先我可以排除掉i=i-1时候的长度，因为i-1的好后缀，没有让i时候的好后缀继续在该位置匹配
-			// 比如ABCBAB这里，好后缀为B时，结果为2，但是好后缀为AB时，由于移动2到达的B前面是C，因此不匹配AB，那么肯定得
-			// 在前缀ABCB中看看是否有好后缀的后缀部分了，又因为运行到这里的时候，我已经知道我这条好后缀没有在除去好后缀
-			// 的字符串找到，所以，可以去掉i-1时候的找到的好后缀后面的所有字符串，即，CB的B和后面的字符串。
-
-			// 看看上一个好后缀的位置，是否在最前面，如果是的话，说明这条i的好后缀没有匹配，但是有小一点的好后缀，在最前面
-			// 有匹配，我可以使用。具体是判断i-1与这个最前面的匹配好后缀的前缀的长度哪个大，如果i-1大于等于，则说明这个
-			// 前缀的确是短与i-1的，i-1的结果我可以直接拿来用。如果不是，则说明这个前缀其实不是前缀，是在中间的，
-			// 但是就是因为在中间，i-1的匹配，i的时候
-			// 不匹配，说明这个子串，多了好后缀一个字符之后，就不匹配了，比如BAOBAB，i为1的时候，找到下标为3的B，但是i为
-			// 2的时候，前面没有AB的匹配项，找i-1的时候，那个B的前面是O，我就不应该直接取i-1的值了作为i时候的值。此时应该
-			// 继续寻找，在i-1这个匹配的位置之前，寻找i-1那条好后缀是否有另外一个匹配，比如例子中最前面的B，就有匹配了，
-			// 所以此时的i的结果是5。
-			// 但是，这个中间，指的是除去i时候的后缀的前面的字符串的中间，没有包含一种情况，这个i-1时候的字符串，
-			// 其移动的位置，恰好到i时候多加的那个字符的位置，比如BABABA，i为2是移动2，i为3是，也应该移动2，因为刚好匹配
-			// 到了倒数第三个A，这个A包含在i的后缀中，并且我们没有拿去比较，并且其前面还是刚好就是ABA。
-
-			if len(reversePattern)-table.goodSuffix[i-1] > i-1 {
-				// 这个i-1时候的匹配串在中间，且i时候没有匹配串，
-				// 如果刚好i-1移动的位置，在这个好后缀里面
-				// 此时我们需要比较，新加入的字符是不是匹配的
-				if pattern[len(pattern)-(i-1)-1] == pattern[len(pattern)-table.goodSuffix[i-1]-(i-1)-1] {
-					// 如果匹配，则我们可以用上一个的值
-					table.goodSuffix[i] = table.goodSuffix[i-1]
-					continue
-				}
-
-				// 如果不匹配，我们只能寄希望字符串的长度为i-1的前缀，
-				// 等于i-1时候的字符串，如果不是，则彻底没有匹配，接下来都需要整条所有字符串
-				if pattern[:i-1] == pattern[len(pattern)-(i-1):] {
-					table.goodSuffix[i] = len(reversePattern) - (i - 1)
-				} else {
-					table.goodSuffix[i] = len(reversePattern)
-				}
+		} else if goodIndex := strings.Index(reversePattern[i:], reversePattern[:i]); goodIndex != -1 {
+			// 借用库函数来寻找第一个好后缀。index是找到的这个好后缀在整条模式字符串中，从后面开始数过来的下标值
+			table.goodSuffix[i] = goodIndex + i
+		} else {
+			// 我们只能寄希望字符串的长度为i-1的前缀，
+			// 等于i-1时候的好后缀，如果不是，则彻底没有匹配，接下来都需要整条所有字符串
+			if pattern[:i-1] == pattern[len(pattern)-(i-1):] {
+				table.goodSuffix[i] = len(reversePattern) - (i - 1)
 			} else {
-				table.goodSuffix[i] = table.goodSuffix[i-1]
+				table.goodSuffix[i] = len(reversePattern)
 			}
 
 			// 这里只会进来一次，找不到一次，后面更不会找到，用i-1的值填入即可
@@ -151,9 +123,6 @@ func newBoyerMooreTable(pattern string) *boyermooreShiftTable {
 				table.goodSuffix[i] = table.goodSuffix[i-1]
 			}
 			break
-
-		} else {
-			table.goodSuffix[i] = goodIndex + i
 		}
 	}
 
