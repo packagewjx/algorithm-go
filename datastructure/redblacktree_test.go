@@ -15,6 +15,20 @@ func TestRedBlackTree_Insert(t *testing.T) {
 	printTree(tree)
 }
 
+func TestRedBlackTree_Delete(t *testing.T) {
+	nums := []int{12, 1, 9, 2, 0, 11, 7, 19, 4, 15, 18, 5, 14, 13, 10, 16, 6, 3, 8, 17}
+
+	tree := &RedBlackTree{}
+	for _, value := range nums {
+		tree.Insert(&dummy{key: value})
+	}
+
+	for _, value := range nums {
+		tree.Delete(value)
+	}
+
+}
+
 func printTree(tree *RedBlackTree) {
 	if tree.root == nil {
 		return
