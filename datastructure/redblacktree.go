@@ -43,9 +43,9 @@ func (n *rbNode) uncle() *rbNode {
 func (n *rbNode) sibling() *rbNode {
 	if n.parent != nil {
 		if n == n.parent.leftChild {
-			return n.rightChild
+			return n.parent.rightChild
 		} else {
-			return n.leftChild
+			return n.parent.leftChild
 		}
 	} else {
 		return nil
@@ -81,6 +81,13 @@ func (tree *RedBlackTree) Insert(data Data) {
 
 // 删除并返回键值为key的数据
 func (tree *RedBlackTree) Delete(key int) Data {
+	// 若是只有一个根，且key相同，可以直接返回了
+	if tree.root.key() == key && tree.root.leftChild == nil && tree.root.rightChild == nil {
+		d := tree.root.data
+		tree.root = nil
+		return d
+	}
+
 	deleteNode := tree.getNode(key)
 	data := deleteNode.data
 
@@ -100,6 +107,15 @@ func (tree *RedBlackTree) Delete(key int) Data {
 	// 现在转换成删除只有一个子女的中间节点或叶子的问题
 	tree.deleteOneChildNode(deleteNode)
 
+	if tree.root.parent != nil {
+		// 当父节点被更改，意味着红黑树的层数不深了，可以递归向上，查找并更新父节点
+		cur := tree.root.parent
+		for cur.parent != nil {
+			cur = cur.parent
+		}
+		tree.root = cur
+	}
+
 	return data
 }
 
@@ -112,7 +128,7 @@ func (tree *RedBlackTree) getNode(key int) *rbNode {
 	for cur != nil && cur.key() != key {
 		if cur.key() > key {
 			cur = cur.leftChild
-		} else /*key >= cur.key*/ {
+		} else /*Key >= cur.Key*/ {
 			cur = cur.rightChild
 		}
 	}
@@ -219,27 +235,28 @@ func (tree *RedBlackTree) deleteOneChildNode(node *rbNode) *rbNode {
 		parentPos = NIL
 	}
 
+	// 首先用儿子值替代本节点
+	if child != nil {
+		child.parent = node.parent
+	}
+	if parentPos == LEFT {
+		node.parent.leftChild = child
+	} else if parentPos == RIGHT {
+		node.parent.rightChild = child
+	} else if parentPos == NIL {
+		// 若没有父节点了，这就是新的子节点
+		tree.root = child
+	}
+
 	// 若删除红色的节点，直接用儿子代替即可
 	if node.color == RED {
-		child.parent = node.parent
-		if parentPos == LEFT {
-			node.parent.leftChild = child
-		} else if parentPos == RIGHT {
-			node.parent.rightChild = child
-		}
 		return deleteNode
 	}
 
 	// 若节点是黑色，而儿子是红色
+	// 更改成黑色，然后返回
 	if node.color == BLACK && child != nil && child.color == RED {
 		child.color = BLACK
-
-		child.parent = node.parent
-		if parentPos == LEFT {
-			node.parent.leftChild = child
-		} else if parentPos == RIGHT {
-			node.parent.rightChild = child
-		}
 		return deleteNode
 	}
 
@@ -252,7 +269,6 @@ func (tree *RedBlackTree) deleteOneChildNode(node *rbNode) *rbNode {
 		child = nilNode
 	}
 	child.parent = node.parent
-
 	if parentPos == LEFT {
 		node.parent.leftChild = child
 	} else {
@@ -261,11 +277,17 @@ func (tree *RedBlackTree) deleteOneChildNode(node *rbNode) *rbNode {
 
 	// 进入递归函数处理
 	deleteNode = tree.deleteBlackNodeAndChild(child)
+
 	if nilNode != nil {
-		// 若使用了nilNode处理
+		// 变回nil
+		if parentPos == LEFT {
+			node.parent.leftChild = nil
+		} else {
+			node.parent.rightChild = nil
+		}
 	}
-	// TODO 没有处理空节点的情况
-	return nil
+
+	return node
 }
 
 // 删除黑儿子和自己黑的时候。注意这里实际上已经被删除，node是本来的儿子
@@ -291,7 +313,7 @@ func (tree *RedBlackTree) deleteBlackNodeAndChild(node *rbNode) *rbNode {
 		}
 		// 继续处理
 		node.parent.color = RED
-		node.sibling().color = BLACK
+		node.grandParent().color = BLACK
 	}
 
 	if node.parent.color == BLACK && node.sibling() != nil && node.sibling().color == BLACK &&
@@ -310,39 +332,48 @@ func (tree *RedBlackTree) deleteBlackNodeAndChild(node *rbNode) *rbNode {
 		(node.sibling().rightChild == nil || node.sibling().rightChild.color == BLACK) {
 		node.parent.color = BLACK
 		node.sibling().color = RED
+		return node
 	}
 
 	// 兄弟节点是黑色，但是其中一个儿子是红色
 	if node.sibling() != nil && node.sibling().color == BLACK {
-		// 首先改变颜色
-		node.sibling().color = RED
-		if node.sibling().leftChild != nil && node.sibling().leftChild.color == RED {
-			// 左儿子是红色，则右旋，让左儿子替代兄弟位置
+
+		if parentPos == LEFT && node.sibling().leftChild != nil && node.sibling().leftChild.color == RED &&
+			(node.sibling().rightChild == nil || node.sibling().rightChild.color == BLACK) {
+			// node是左儿子，兄弟的左儿子是红色，右儿子是黑色，则右旋，让左儿子替代兄弟位置
+			node.sibling().color = RED
+			node.sibling().leftChild.color = BLACK
 			rbRRotation(node.sibling())
-		} else if node.sibling().rightChild != nil && node.sibling().rightChild.color == RED {
+		} else if parentPos == RIGHT && node.sibling().rightChild != nil && node.sibling().rightChild.color == RED &&
+			(node.sibling().leftChild == nil || node.sibling().leftChild.color == BLACK) {
+			// node是右儿子
+			node.sibling().color = RED
+			node.sibling().rightChild.color = BLACK
 			rbLRotation(node.sibling())
 		}
-		// 兄弟节点变了，改成黑色
-		node.sibling().color = BLACK
 	}
 
-	// 如果兄弟节点中，有红色子节点，且兄弟是右子节点且其红色子节点也是右子节点或相反
-	if node.sibling() != nil && node.sibling().color == BLACK &&
-		node.sibling() == node.parent.rightChild && node.sibling().rightChild != nil &&
-		node.sibling().rightChild.color == RED {
-		rbLRotation(node.parent)
-		// 交换颜色
-		node.grandParent().color = node.parent.color
-		node.parent.color = BLACK
-	} else if node.sibling() != nil && node.sibling().color == BLACK &&
-		node.sibling() == node.parent.leftChild && node.sibling().leftChild != nil &&
-		node.sibling().leftChild.color == RED {
-		rbRRotation(node.parent)
-		node.grandParent().color = node.parent.color
-		node.parent.color = BLACK
+	// 兄弟是黑色，且兄弟节点中，有红色子节点，且兄弟是右子节点且其红色子节点也是右子节点或相反
+	if node.sibling() != nil && node.sibling().color == BLACK {
+		if node.sibling() == node.parent.rightChild && node.sibling().rightChild != nil &&
+			node.sibling().rightChild.color == RED {
+			rbLRotation(node.parent)
+			// 交换颜色
+			node.grandParent().color = node.parent.color
+			node.parent.color = BLACK
+			// 变换原本兄弟的红色子女为黑色
+			node.grandParent().rightChild.color = BLACK
+		} else if node.sibling() == node.parent.leftChild && node.sibling().leftChild != nil &&
+			node.sibling().leftChild.color == RED {
+			rbRRotation(node.parent)
+			node.grandParent().color = node.parent.color
+			node.parent.color = BLACK
+			node.grandParent().leftChild.color = BLACK
+		}
+
 	}
 
-	return nil
+	return node
 }
 
 // 旋转后返回新的根，将会设置好祖父、子节点等的关系
