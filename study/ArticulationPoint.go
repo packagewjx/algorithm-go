@@ -1,135 +1,62 @@
 package study
 
-import (
-	"fmt"
-	"strconv"
-)
+import . "github.com/packagewjx/algorithm-go/datastructure"
 
-type vertex struct {
-	name     string
-	adjacent []*vertex
+var visited map[*Vertex]int
+var low map[*Vertex]int
+var visitNum int
+var articulationPoints map[*Vertex]bool
+
+func ArticulationPoint(v *Vertex) []*Vertex {
+	articulationPoints = map[*Vertex]bool{}
+	visited = map[*Vertex]int{}
+	low = map[*Vertex]int{}
+	visitNum = 0
+
+	dfs(v, nil)
+
+	ap := []*Vertex{}
+	for key, _ := range articulationPoints {
+		ap = append(ap, key)
+	}
+	return ap
 }
 
-func (v *vertex) String() string {
-	adjacents := ""
-	for _, value := range v.adjacent {
-		adjacents += value.name + " "
-	}
-	adjacents = adjacents[:len(adjacents)-1]
-	return fmt.Sprintf("%s:[%s]", v.name, adjacents)
-}
+func dfs(v *Vertex, predecessor *Vertex) {
+	visited[v] = visitNum
+	visitNum++
+	low[v] = visited[predecessor]
 
-func buildFromMap(adjacentMap map[string][]string) map[string]*vertex {
-	vertices := make(map[string]*vertex)
-
-	for name, _ := range adjacentMap {
-		vertices[name] = &vertex{name: name, adjacent: []*vertex{}}
-	}
-
-	for name, v := range vertices {
-		adjacents := adjacentMap[name]
-		for _, adjacent := range adjacents {
-			v.adjacent = append(v.adjacent, vertices[adjacent])
-		}
-	}
-
-	return vertices
-}
-
-func buildFromMatrix(adjacentMatrix [][]bool) map[string]*vertex {
-	vertices := make(map[string]*vertex)
-
-	getOrCreate := func(name string) (v *vertex) {
-		if mv, ok := vertices[name]; !ok {
-			v = &vertex{name: name, adjacent: []*vertex{}}
-			vertices[name] = v
-		} else {
-			v = mv
-		}
-		return
-	}
-
-	for cur, adjacents := range adjacentMatrix {
-		name := strconv.Itoa(cur)
-		// 先从已有点图查看是否之前已经创建了
-		v := getOrCreate(name)
-
-		for vName, isAdjacent := range adjacents {
-			if isAdjacent {
-				av := getOrCreate(strconv.Itoa(vName))
-				v.adjacent = append(v.adjacent, av)
+	for _, adj := range v.Adjacent {
+		if adjVisited, ok := visited[adj]; ok {
+			if adj == predecessor {
+				// 若是从这个点过来的就不用再执行了，已经赋过值
+				continue
 			}
-		}
-	}
-
-	return vertices
-}
-
-var visited map[*vertex]bool
-
-func simpleDFS(v *vertex) {
-	visited = make(map[*vertex]bool)
-	simpleDFSRecursive(v)
-}
-
-func simpleDFSRecursive(v *vertex) {
-	fmt.Println(v.name)
-	visited[v] = true
-	for _, val := range v.adjacent {
-		if !visited[val] {
-			simpleDFSRecursive(val)
-		}
-	}
-}
-
-var predecessor map[*vertex]*vertex
-var discovery map[*vertex]int
-
-// 在DFS树中，某个点v经过其自己或者后代（discovery比v大）能够到达的最先被访问过的点的discovery数字
-var lowerDiscovery map[*vertex]int
-var articulationPoints []*vertex
-var time int
-
-func articulationPoint(v *vertex) []*vertex {
-	predecessor = map[*vertex]*vertex{}
-	discovery = map[*vertex]int{}
-	time = 1
-	articulationPoints = []*vertex{}
-	lowerDiscovery = map[*vertex]int{}
-
-	findAPRecursive(v)
-	return articulationPoints
-}
-
-//problematic
-func findAPRecursive(v *vertex) (lowDiscovery int) {
-	discovery[v] = time
-	lowerDiscovery[v] = time
-	time++
-
-	for _, av := range v.adjacent {
-		if discovery[av] == 0 {
-			// 0代表这个点还没有被访问
-			predecessor[av] = v
-			lowOfAv := findAPRecursive(av)
-			if lowOfAv < lowerDiscovery[v] {
-				lowerDiscovery[v] = lowOfAv
+			// 若已经访问过，则看这个点的visited是不是比low[v]要小
+			if adjVisited < low[v] {
+				// 是的话，说明v可以访问这个visited更小的点，更新low[v]
+				low[v] = adjVisited
 			}
+			continue
+		}
 
-		} else {
-			// 这个点之前被访问过了
-			if predecessor[v] != av && discovery[av] < lowerDiscovery[v] {
-				// 第一个如果是true，则代表这是回边
-				// 并且如果这个邻接点，包括前面的点，比我的能去的最先的小
-				// 我的lower就可以设置更小的
-				lowerDiscovery[v] = discovery[av]
-			}
+		// 若没有访问，则继续访问下去
+		dfs(adj, v)
+
+		if low[adj] >= visited[v] {
+			// 如果我的子节点能够访问的最低visited节点大于等于我，就是说明子节点最多能访问
+			// 到我，因此我是关节点
+			articulationPoints[v] = true
+		} else if low[adj] < low[v] {
+			// 如果我的子节点能够去比我更低的地方，说明我也可以去这个更低的地方，
+			// 因此更新low[v]
+			low[v] = low[adj]
 		}
 	}
 
-	if discovery[v] <= lowerDiscovery[v] || (predecessor[v] == nil && len(v.adjacent) > 1) {
-		articulationPoints = append(articulationPoints, v)
+	if predecessor == nil && len(v.Adjacent) > 1 {
+		articulationPoints[v] = true
 	}
 
-	return lowerDiscovery[v]
 }
