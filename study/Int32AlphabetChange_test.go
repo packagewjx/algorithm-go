@@ -4,6 +4,30 @@ import (
 	"testing"
 )
 
+func BenchmarkToUpperCaseUnsafe(b *testing.B) {
+	str := "@ABCDEFGHIJKLMNOPQRSTUVWXYZ_`abcdefghijklmnopqrstuvwxyz{|}"
+	for i := 0; i < 1000; i++ {
+		str += "@ABCDEFGHIJKLMNOPQRSTUVWXYZ_`abcdefghijklmnopqrstuvwxyz{|}"
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		toUpperCaseUnsafeV2(str)
+	}
+}
+
+func BenchmarkToUpperCaseByte(b *testing.B) {
+	str := "@ABCDEFGHIJKLMNOPQRSTUVWXYZ_`abcdefghijklmnopqrstuvwxyz{|}"
+	for i := 0; i < 1000; i++ {
+		str += "@ABCDEFGHIJKLMNOPQRSTUVWXYZ_`abcdefghijklmnopqrstuvwxyz{|}"
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		toUpperCaseByte(str)
+	}
+}
+
 func TestAlphabetChange(t *testing.T) {
 	testCases := []struct {
 		text   string
@@ -21,8 +45,12 @@ func TestAlphabetChange(t *testing.T) {
 
 	for _, val := range testCases {
 		upperCase := toUpperCase(val.text)
+		upperCaseUnsafe := toUpperCaseUnsafeV2(val.text)
 		if upperCase != val.result {
 			t.Error(upperCase, val.result)
+		}
+		if upperCaseUnsafe != val.result {
+			t.Error(upperCaseUnsafe, val.result)
 		}
 	}
 }

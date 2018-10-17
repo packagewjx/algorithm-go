@@ -2,6 +2,7 @@ package study
 
 import (
 	"encoding/binary"
+	"unsafe"
 )
 
 // 试着以32位的形式处理由小写转换大写的
@@ -54,16 +55,42 @@ func toUpperCase(text string) string {
 	return string(newBytes)
 }
 
+func toUpperCaseUnsafeV2(text string) string {
+	if text == "" {
+		return ""
+	}
+
+	b := []byte(text)
+	uint32Bytes := (*[]uint32)(unsafe.Pointer(&b))
+
+	for i := 0; i < len(b)/4+1; i++ {
+		(*uint32Bytes)[i] = uint32toUpperCaseV2((*uint32Bytes)[i])
+	}
+
+	return string(b)
+}
+
+// 常规按字节处理方法
+func toUpperCaseByte(text string) string {
+	b := []byte(text)
+	for i := 0; i < len(b); i++ {
+		if b[i] > 96 && b[i] < 123 {
+			b[i] -= 32
+		}
+	}
+	return string(b)
+}
+
 // 核心算法
 func uint32toUpperCase(char uint32) uint32 {
 	// 首先查看应该所有字节都大于等于97，也就是每一字节减去97应该为正数
 	// 也就是加上-97给每一位
 	num1 := char + 0x9F9F9F9F
 	// 取每字节最高位，然后取反
-	smallerThan97 := num1&0x80808080 ^ 0x80808080
+	carry := num1&0x80808080 ^ 0x80808080
 	// 减去进位
-	num1 -= smallerThan97 << 1
-	smallerThan97 = num1 & 0x80808080
+	num1 -= carry << 1
+	smallerThan97 := num1 & 0x80808080
 
 	// 全部小于，立即返回
 	if smallerThan97 == 0x80808080 {
@@ -72,13 +99,13 @@ func uint32toUpperCase(char uint32) uint32 {
 
 	// 是否小于等于122，也就是小于123，也就是减去123应该是负数，也就是加上-123
 	num1 = char + 0x85858585
-	biggerThan122 := num1&0x80808080 ^ 0x80808080
+	carry = num1&0x80808080 ^ 0x80808080
 
 	// 若两个字节相减，得到正数，将会有一个进位在第9个比特位置，虽然对字节没影响
 	// 但是会影响我们这个方法，给前一个字节加了1，因此需要减掉，
 	// 只需左移biggerThan123然后减去就行吧
-	num1 -= biggerThan122 << 1
-	biggerThan122 = num1 & 0x80808080
+	num1 -= carry << 1
+	biggerThan122 := num1 & 0x80808080
 
 	// 全部大于，立即返回
 	if biggerThan122 == 0 {
@@ -97,4 +124,55 @@ func uint32toUpperCase(char uint32) uint32 {
 	shouldDecrease = shouldDecrease & (biggerThan122 >> 2)
 
 	return char - shouldDecrease
+}
+
+// 加法只有3次
+func uint32toUpperCaseV2(char uint32) uint32 {
+	shouldDecrease := uint32(0x20202020)
+
+	smallerThan97 := (char + 0x9F9F9F9F) & 0x80808080
+
+	if smallerThan97 == 0x80808080 {
+		return char
+	}
+
+	shouldDecrease = shouldDecrease ^ (smallerThan97 >> 2)
+
+	biggerThan123 := (char + 0x85858585) & 0x80808080
+
+	if biggerThan123 == 0 {
+		return char
+	}
+
+	shouldDecrease = shouldDecrease & (biggerThan123 >> 2)
+
+	// 处理特殊情况,0x60与0x7A
+	if char&0xFF000000 == 0x60000000 {
+		shouldDecrease = shouldDecrease & 0x00FFFFFF
+	}
+	if char&0x00FF0000 == 0x00600000 {
+		shouldDecrease = shouldDecrease & 0xFF00FFFF
+	}
+	if char&0x0000FF00 == 0x00006000 {
+		shouldDecrease = shouldDecrease & 0xFFFF00FF
+	}
+	if char&0x000000FF == 0x00000060 {
+		shouldDecrease = shouldDecrease & 0xFFFFFF00
+	}
+
+	if char&0xFF000000 == 0x7A000000 {
+		shouldDecrease = shouldDecrease | 0x20000000
+	}
+	if char&0x00FF0000 == 0x007A0000 {
+		shouldDecrease = shouldDecrease | 0x00200000
+	}
+	if char&0x0000FF00 == 0x00007A00 {
+		shouldDecrease = shouldDecrease | 0x00002000
+	}
+	if char&0x000000FF == 0x0000007A {
+		shouldDecrease = shouldDecrease | 0x00000020
+	}
+
+	return char - shouldDecrease
+
 }
