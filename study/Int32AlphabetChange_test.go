@@ -12,7 +12,7 @@ func BenchmarkToUpperCaseUnsafe(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		toUpperCaseUnsafeV2(str)
+		toUpperCaseUnsafe(str)
 	}
 }
 
@@ -45,7 +45,7 @@ func TestAlphabetChange(t *testing.T) {
 
 	for _, val := range testCases {
 		upperCase := toUpperCase(val.text)
-		upperCaseUnsafe := toUpperCaseUnsafeV2(val.text)
+		upperCaseUnsafe := toUpperCaseUnsafe(val.text)
 		if upperCase != val.result {
 			t.Error(upperCase, val.result)
 		}

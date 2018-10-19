@@ -55,7 +55,7 @@ func toUpperCase(text string) string {
 	return string(newBytes)
 }
 
-func toUpperCaseUnsafeV2(text string) string {
+func toUpperCaseUnsafe(text string) string {
 	if text == "" {
 		return ""
 	}
@@ -64,7 +64,7 @@ func toUpperCaseUnsafeV2(text string) string {
 	uint32Bytes := (*[]uint32)(unsafe.Pointer(&b))
 
 	for i := 0; i < len(b)/4+1; i++ {
-		(*uint32Bytes)[i] = uint32toUpperCaseV2((*uint32Bytes)[i])
+		(*uint32Bytes)[i] = uint32toUpperCaseV3((*uint32Bytes)[i])
 	}
 
 	return string(b)
@@ -175,4 +175,23 @@ func uint32toUpperCaseV2(char uint32) uint32 {
 
 	return char - shouldDecrease
 
+}
+
+// 极致性能
+func uint32toUpperCaseV3(char uint32) uint32 {
+
+	// 0xE1是96前面一位为1
+	num1 := uint32(0xE0E0E0E0)
+	// 0xFA是122前面一位为1
+	num2 := uint32(0xFAFAFAFA)
+
+	// 字节最高位为1的就是小于97的
+	lessThan97 := (num1 - char) & 0x80808080
+	// 字节高位为1的就是小于122的
+	lessThanEqualTo122 := (num2 - char) & 0x80808080
+
+	// smallerThan97最高位为0的和smallerThan123最高位为1的，就是在区间内的，与其来
+	between97And122 := (lessThan97 ^ 0x80808080) & lessThanEqualTo122
+
+	return char ^ (between97And122 >> 2)
 }

@@ -98,3 +98,47 @@ func BuildFromMatrix(matrix [][]int) map[int]*WeightedDirectedVertex {
 
 	return vertices
 }
+
+type MatrixBasedGraph struct {
+	// 第一个下标为起始点，第二个为终点，值为权重
+	Matrix [][]int
+}
+
+func NewMatrixBasedGraphUsingList(list map[int][]int) *MatrixBasedGraph {
+	graph := &MatrixBasedGraph{Matrix: make([][]int, len(list), len(list))}
+	for v, adj := range list {
+		graph.Matrix[v] = make([]int, len(list), len(list))
+
+		for _, adv := range adj {
+			graph.Matrix[v][adv] = 1
+		}
+	}
+
+	return graph
+}
+
+// 返回图，key为vertex的序号，值为边的权重
+func (g *MatrixBasedGraph) Adjacent(v int) map[int]int {
+	adj := make(map[int]int, 10)
+	for key, weight := range g.Matrix[v] {
+		if weight > 0 {
+			adj[key] = weight
+		}
+	}
+	return adj
+}
+
+func (g *MatrixBasedGraph) Len() int {
+	return len(g.Matrix)
+}
+
+// 有向图中求反向边的函数，找出哪些顶点有到v的路径
+func (g *MatrixBasedGraph) BackwardEdge(v int) map[int]int {
+	back := make(map[int]int, 10)
+	for i := 0; i < len(g.Matrix); i++ {
+		if g.Matrix[i][v] > 0 {
+			back[i] = g.Matrix[i][v]
+		}
+	}
+	return back
+}

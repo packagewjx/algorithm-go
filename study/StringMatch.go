@@ -185,3 +185,13 @@ func (BoyerMooreMatcher) Match(matchString, text string) int {
 	}
 	return -1
 }
+
+// ===================================================KMP算法===========================================================
+
+type KMPMatcher struct {
+}
+
+func (KMPMatcher) Match(matchString, text string) int {
+
+	return 0
+}
