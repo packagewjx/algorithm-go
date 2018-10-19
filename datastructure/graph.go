@@ -63,3 +63,38 @@ func BuildVerticesFromMatrix(adjacentMatrix [][]bool) map[int]*Vertex {
 
 	return vertices
 }
+
+type WeightedDirectedVertex struct {
+	Data Data
+	// 由本顶点指向的下一个顶点，和权重
+	Next map[*WeightedDirectedVertex]int
+}
+
+func (w *WeightedDirectedVertex) Key() int {
+	return w.Data.Key()
+}
+
+func BuildFromMatrix(matrix [][]int) map[int]*WeightedDirectedVertex {
+	vertices := make(map[int]*WeightedDirectedVertex, len(matrix))
+
+	// 先创建所有顶点
+	for i := 0; i < len(matrix); i++ {
+		vertices[i] = &WeightedDirectedVertex{Data: &Dummy{K: i}, Next: map[*WeightedDirectedVertex]int{}}
+	}
+
+	for i := 0; i < len(matrix); i++ {
+		cur := vertices[i]
+		for j := 0; j < len(matrix[i]); j++ {
+			if i == j {
+				continue
+			}
+
+			if matrix[i][j] > 0 {
+				next := vertices[j]
+				cur.Next[next] = matrix[i][j]
+			}
+		}
+	}
+
+	return vertices
+}
