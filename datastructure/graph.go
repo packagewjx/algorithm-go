@@ -128,6 +128,10 @@ func (g *MatrixBasedGraph) Adjacent(v int) map[int]int {
 	return adj
 }
 
+func (g *MatrixBasedGraph) Weight(start, end int) int {
+	return g.Matrix[start][end]
+}
+
 func (g *MatrixBasedGraph) Len() int {
 	return len(g.Matrix)
 }
@@ -141,4 +145,82 @@ func (g *MatrixBasedGraph) BackwardEdge(v int) map[int]int {
 		}
 	}
 	return back
+}
+
+type VertexSet struct {
+	Vertices map[int]bool
+}
+
+func NewVertexSet() *VertexSet {
+	return &VertexSet{Vertices: map[int]bool{}}
+}
+
+func (set *VertexSet) Add(v int) {
+	set.Vertices[v] = true
+}
+
+// 查看某个顶点v是否在点集中
+func (set *VertexSet) Exist(v int) bool {
+	return set.Vertices[v]
+}
+
+func (set *VertexSet) AllPoint() []int {
+	result := make([]int, 0, len(set.Vertices))
+
+	for v, exist := range set.Vertices {
+		if exist {
+			result = append(result, v)
+		}
+	}
+
+	return result
+}
+
+type EdgeSet struct {
+	// 边以长度为2数组形式保存
+	Edges map[int][]int
+}
+
+func NewEdgeSet() *EdgeSet {
+	return &EdgeSet{map[int][]int{}}
+}
+
+func (set *EdgeSet) Add(start, end int) {
+	hash := start ^ end
+	for edge, ok := set.Edges[hash]; ok && edge[0] != start && edge[1] != end; edge, ok = set.Edges[hash] {
+		// 解决冲突
+		hash = hash + start + 1
+	}
+
+	// 保存数据
+	set.Edges[hash] = []int{start, end}
+}
+
+func (set *EdgeSet) Exist(start, end int) bool {
+	hash := start ^ end
+	var ok bool
+	var edge []int
+	for edge, ok = set.Edges[hash]; ok && edge[0] != start && edge[1] != end; edge, ok = set.Edges[hash] {
+		// 往下查找
+		hash = hash + start + 1
+	}
+
+	if !ok {
+		return false
+	} else if edge[0] == start && edge[1] == end {
+		return true
+	}
+	return false
+}
+
+func (set *EdgeSet) AllEdges() [][]int {
+	result := make([][]int, 0, len(set.Edges))
+	for _, edge := range set.Edges {
+		result = append(result, edge)
+	}
+	return result
+}
+
+func (set *EdgeSet) Len() int {
+	return len(set.Edges)
 }

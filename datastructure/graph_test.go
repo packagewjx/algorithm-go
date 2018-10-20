@@ -17,3 +17,14 @@ func TestBuildFromMatrix(t *testing.T) {
 	fromMatrix := BuildFromMatrix(matrix)
 	fmt.Println(fromMatrix)
 }
+
+func TestEdgeSet_Add(t *testing.T) {
+	edgeSet := NewEdgeSet()
+
+	edgeSet.Add(0, 1)
+	edgeSet.Add(0, 2)
+	edgeSet.Add(0, 3)
+	edgeSet.Add(0, 4)
+
+	fmt.Println(edgeSet.AllEdges())
+}
