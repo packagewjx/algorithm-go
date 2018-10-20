@@ -35,7 +35,7 @@ func (heap *edgeMinHeap) Swap(i, j int) {
 }
 
 func Prim(graph *MatrixBasedGraph) *EdgeSet {
-	vertices := NewVertexSet()
+	vertices := NewVertexSet(graph.Len())
 	edges := NewEdgeSet()
 
 	// 使用最小堆存储所有边

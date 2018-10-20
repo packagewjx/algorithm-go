@@ -148,11 +148,11 @@ func (g *MatrixBasedGraph) BackwardEdge(v int) map[int]int {
 }
 
 type VertexSet struct {
-	Vertices map[int]bool
+	Vertices []bool
 }
 
-func NewVertexSet() *VertexSet {
-	return &VertexSet{Vertices: map[int]bool{}}
+func NewVertexSet(length int) *VertexSet {
+	return &VertexSet{Vertices: make([]bool, length)}
 }
 
 func (set *VertexSet) Add(v int) {
