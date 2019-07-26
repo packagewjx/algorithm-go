@@ -15,18 +15,25 @@ import (
 
 type path struct {
 	// 后缀长度
-	sfxLen int          `json:"sfx_len"`
-	dest   []*sequence3 `json:"dest"`
+	sfxLen int
+	dest   []*sequence3
+}
+
+type calculatedPath struct {
+	path   []*sequence3
+	concat *string
 }
 
 type sequence3 struct {
-	sequence *string `json:"sequence"`
+	sequence *string
 	// 本字符串最长后缀能够匹配的前缀的路径
-	next *path `json:"next"`
+	next               *path
+	calculatedPaths    []*calculatedPath
+	calculatedPathLock sync.Mutex
 }
 
 type prefixStore3 struct {
-	sequences []*sequence3 `json:"sequences"`
+	sequences []*sequence3
 	lock      sync.Mutex
 }
 
@@ -75,6 +82,29 @@ func printPath(path []*sequence3) {
 		fmt.Print((*path[i].sequence)[path[i+1].next.sfxLen:])
 	}
 	fmt.Println()
+}
+
+func outputToFile(ctx *context3) {
+	file, _ := os.Create("context3.txt")
+	writer := bufio.NewWriter(file)
+
+	outputs := make([]string, 0)
+	ctx.prefixes.Range(func(key, value interface{}) bool {
+		prefix := key.(string)
+		seqs := value.(*prefixStore3)
+		output := prefix + " : "
+		for i := 0; i < len(seqs.sequences); i++ {
+			output += *seqs.sequences[i].sequence + " "
+		}
+		output += "\n"
+		outputs = append(outputs, output)
+		return true
+	})
+	sort.Strings(outputs)
+	for i := 0; i < len(outputs); i++ {
+		writer.WriteString(outputs[i])
+	}
+	file.Close()
 }
 
 var lastPercent = 0
@@ -300,27 +330,147 @@ func breathFirstSearch(seq *sequence3, ctx *context3, queueInitialLength uint64)
 	return results
 }
 
-func outputToFile(ctx *context3) {
-	file, _ := os.Create("context3.txt")
-	writer := bufio.NewWriter(file)
-
-	outputs := make([]string, 0)
-	ctx.prefixes.Range(func(key, value interface{}) bool {
-		prefix := key.(string)
-		seqs := value.(*prefixStore3)
-		output := prefix + " : "
-		for i := 0; i < len(seqs.sequences); i++ {
-			output += *seqs.sequences[i].sequence + " "
+// 线程不安全的函数
+func breathFirstSearchV2(seq *sequence3, ctx *context3, queueInitialLength uint64) []*string {
+	// 检查这个节点是否在前面出现过而组成回路，如果没有，则可以加入
+	canAddNodeToPath := func(seq3 *sequence3, path []*sequence3, concat *string) bool {
+		for i := 0; i < len(path); i++ {
+			if path[i] == seq3 {
+				return false
+			}
 		}
-		output += "\n"
-		outputs = append(outputs, output)
+
+		// 检查是否会有子串的出现
+		if strings.Contains(*concat, *seq3.sequence) {
+			return false
+		}
 		return true
-	})
-	sort.Strings(outputs)
-	for i := 0; i < len(outputs); i++ {
-		writer.WriteString(outputs[i])
 	}
-	file.Close()
+
+	// 实际进行广度遍历的函数
+	doBFS := func(seq *sequence3, ctx *context3, queueInitialLength uint64) []*calculatedPath {
+		if seq.calculatedPaths != nil {
+			return seq.calculatedPaths
+		}
+		if seq.next == nil || len(seq.next.dest) == 0 {
+			// 结束点
+			return []*calculatedPath{
+				{
+					path:   []*sequence3{seq},
+					concat: seq.sequence,
+				},
+			}
+		}
+
+		type bfsArg struct {
+			seq3   *sequence3
+			concat *string
+			path   []*sequence3
+		}
+		// 结果集初始化
+		calculatedPaths := make([]*calculatedPath, 0, 10)
+
+		// 初始化广度遍历队列
+		bfsQueue := NewQueue(queueInitialLength, time.Duration(0))
+		for i := 0; i < len(seq.next.dest); i++ {
+			nextSeq := seq.next.dest[i]
+			newConcat := *seq.sequence + (*nextSeq.sequence)[seq.next.sfxLen:]
+			arg := &bfsArg{
+				seq3:   nextSeq,
+				concat: &newConcat,
+				path:   []*sequence3{seq, nextSeq},
+			}
+			bfsQueue.Put(arg)
+		}
+
+		// 广度遍历开始
+		item, ok, _ := bfsQueue.Get()
+		for ok {
+			arg := item.(*bfsArg)
+			noNextAdd := true
+			usedOldResult := false
+
+			if arg.seq3.next != nil && len(arg.seq3.next.dest) > 0 {
+				// 加入子节点，并检查是否是最后一个节点（没有子节点能加入）
+				for i := 0; i < len(arg.seq3.next.dest); i++ {
+					nextSeq := arg.seq3.next.dest[i]
+					// 先检查是否可以加入这个节点
+					if canAddNodeToPath(nextSeq, arg.path, arg.concat) {
+						nextConcat := *arg.concat + (*nextSeq.sequence)[arg.seq3.next.sfxLen:]
+						nextPath := append(arg.path, nextSeq)
+						// 如果已经计算过了这个节点的路径，则可以用来计算结果集
+						// FIXME 路径中间断开的错误
+						if nextSeq.calculatedPaths != nil {
+							for j := 0; j < len(nextSeq.calculatedPaths); j++ {
+								cp := nextSeq.calculatedPaths[j]
+								newPath := make([]*sequence3, len(nextPath), len(arg.path)+len(cp.path))
+								copy(newPath, nextPath)
+								newConcat := nextConcat
+								last := nextSeq
+								// 第一个元素就是next，因此从1开始
+								for k := 1; k < len(cp.path); k++ {
+									node := cp.path[k]
+									if !canAddNodeToPath(node, newPath, &newConcat) {
+										break
+									}
+									newPath = append(newPath, node)
+									newConcat += (*node.sequence)[last.next.sfxLen:]
+									last = node
+								}
+								// 添加完毕，加入到结果集
+								newCp := &calculatedPath{
+									path:   newPath,
+									concat: &newConcat,
+								}
+								calculatedPaths = append(calculatedPaths, newCp)
+							}
+							usedOldResult = true
+							continue
+						}
+
+						// 还没遍历过这个节点，加入到广度遍历队列中
+						noNextAdd = false
+						newArg := &bfsArg{
+							seq3:   nextSeq,
+							concat: &nextConcat,
+							path:   nextPath,
+						}
+						bfsQueue.Put(newArg)
+					}
+				}
+			}
+
+			// 若是没有加入后面的节点，且没有使用到后面节点的已经算好的结果，则说明本节点是终点，加入本路径到结果集
+			if noNextAdd && !usedOldResult {
+				cp := &calculatedPath{
+					path:   arg.path,
+					concat: arg.concat,
+				}
+				calculatedPaths = append(seq.calculatedPaths, cp)
+			}
+			item, ok, _ = bfsQueue.Get()
+		}
+		return calculatedPaths
+	}
+
+	if seq.calculatedPaths == nil {
+		seq.calculatedPathLock.Lock()
+		if seq.calculatedPaths == nil {
+			// 实际计算路径
+			paths := doBFS(seq, ctx, queueInitialLength)
+			seq.calculatedPaths = paths
+			seq.calculatedPathLock.Unlock()
+		} else {
+			seq.calculatedPathLock.Unlock()
+		}
+	}
+
+	ret := make([]*string, 0, len(seq.calculatedPaths))
+	for i := 0; i < len(seq.calculatedPaths); i++ {
+		ret = append(ret, seq.calculatedPaths[i].concat)
+	}
+
+	return ret
 }
 
 func ConcatV3(sequences []string, minimumLength int) *string {
@@ -402,7 +552,7 @@ func ConcatV3(sequences []string, minimumLength int) *string {
 				progressBar(int(doneCnt), nodeCnt, false)
 			}()
 
-			result := breathFirstSearch(seq, ctx, uint64(nodeCnt/4))
+			result := breathFirstSearchV2(seq, ctx, uint64(nodeCnt/4))
 			{
 				lrLock.Lock()
 				for i := 0; i < len(result); i++ {

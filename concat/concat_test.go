@@ -38,8 +38,8 @@ func TestSmallData(t *testing.T) {
 }
 
 func TestBigData(t *testing.T) {
-	length := 15000
-	size := 15000
+	length := 1000
+	size := 1000
 	min := 80
 	max := 150
 
