@@ -174,7 +174,7 @@ func combine(idx *index, ctx *context) {
 	}
 }
 
-func concat(sequences []string, minimumLength int) *string {
+func Concat(sequences []string, minimumLength int) *string {
 	var ctx context
 	ctx.minimumLength = minimumLength
 	for i := 0; i < 26; i++ {
