@@ -19,17 +19,10 @@ type path struct {
 	dest   []*sequence3
 }
 
-type calculatedPath struct {
-	path   []*sequence3
-	concat *string
-}
-
 type sequence3 struct {
 	sequence *string
 	// 本字符串最长后缀能够匹配的前缀的路径
-	next               *path
-	calculatedPaths    []*calculatedPath
-	calculatedPathLock sync.Mutex
+	next *path
 }
 
 type prefixStore3 struct {
@@ -105,43 +98,6 @@ func outputToFile(ctx *context3) {
 		writer.WriteString(outputs[i])
 	}
 	file.Close()
-}
-
-var lastPercent = 0
-var barLock = sync.Mutex{}
-
-func progressBar(current, total int, initial bool) {
-	barLock.Lock()
-	defer barLock.Unlock()
-	barWidth := 50
-	// 初始化
-	if initial {
-		lastPercent = 0
-		fmt.Print("[-                                                 ] 0 %")
-		return
-	}
-	// 计算百分比，并在百分比不变的情况下退出
-	percent := int(float64(current) / float64(total) * 100)
-	if percent <= lastPercent {
-		return
-	}
-	lastPercent = percent
-
-	// 输出新的进度条
-	fmt.Print("\r[")
-	buf := make([]byte, 50)
-	doubleBar := percent / (100 / barWidth)
-	for i := 0; i < doubleBar; i++ {
-		buf[i] = '='
-	}
-	if doubleBar < barWidth {
-		buf[doubleBar] = '-'
-		for i := doubleBar + 1; i < barWidth; i++ {
-			buf[i] = ' '
-		}
-	}
-	fmt.Print(string(buf))
-	fmt.Print("]", percent, "%")
 }
 
 func insertPrefix(str *string, ctx *context3) {
@@ -330,149 +286,6 @@ func breathFirstSearch(seq *sequence3, ctx *context3, queueInitialLength uint64)
 	return results
 }
 
-// 线程不安全的函数
-func breathFirstSearchV2(seq *sequence3, ctx *context3, queueInitialLength uint64) []*string {
-	// 检查这个节点是否在前面出现过而组成回路，如果没有，则可以加入
-	canAddNodeToPath := func(seq3 *sequence3, path []*sequence3, concat *string) bool {
-		for i := 0; i < len(path); i++ {
-			if path[i] == seq3 {
-				return false
-			}
-		}
-
-		// 检查是否会有子串的出现
-		if strings.Contains(*concat, *seq3.sequence) {
-			return false
-		}
-		return true
-	}
-
-	// 实际进行广度遍历的函数
-	doBFS := func(seq *sequence3, ctx *context3, queueInitialLength uint64) []*calculatedPath {
-		if seq.calculatedPaths != nil {
-			return seq.calculatedPaths
-		}
-		if seq.next == nil || len(seq.next.dest) == 0 {
-			// 结束点
-			return []*calculatedPath{
-				{
-					path:   []*sequence3{seq},
-					concat: seq.sequence,
-				},
-			}
-		}
-
-		type bfsArg struct {
-			seq3   *sequence3
-			concat *string
-			path   []*sequence3
-		}
-		// 结果集初始化
-		calculatedPaths := make([]*calculatedPath, 0, 10)
-
-		// 初始化广度遍历队列
-		bfsQueue := NewQueue(queueInitialLength, time.Duration(0))
-		for i := 0; i < len(seq.next.dest); i++ {
-			nextSeq := seq.next.dest[i]
-			newConcat := *seq.sequence + (*nextSeq.sequence)[seq.next.sfxLen:]
-			arg := &bfsArg{
-				seq3:   nextSeq,
-				concat: &newConcat,
-				path:   []*sequence3{seq, nextSeq},
-			}
-			bfsQueue.Put(arg)
-		}
-
-		// 广度遍历开始
-		item, ok, _ := bfsQueue.Get()
-		for ok {
-			arg := item.(*bfsArg)
-			noNextAdd := true
-			usedOldResult := false
-
-			if arg.seq3.next != nil && len(arg.seq3.next.dest) > 0 {
-				// 加入子节点，并检查是否是最后一个节点（没有子节点能加入）
-				for i := 0; i < len(arg.seq3.next.dest); i++ {
-					nextSeq := arg.seq3.next.dest[i]
-					// 先检查是否可以加入这个节点
-					if canAddNodeToPath(nextSeq, arg.path, arg.concat) {
-						nextConcat := *arg.concat + (*nextSeq.sequence)[arg.seq3.next.sfxLen:]
-						nextPath := append(arg.path, nextSeq)
-						// 如果已经计算过了这个节点的路径，则可以用来计算结果集
-						// FIXME 路径中间断开的错误
-						if nextSeq.calculatedPaths != nil {
-							for j := 0; j < len(nextSeq.calculatedPaths); j++ {
-								cp := nextSeq.calculatedPaths[j]
-								newPath := make([]*sequence3, len(nextPath), len(arg.path)+len(cp.path))
-								copy(newPath, nextPath)
-								newConcat := nextConcat
-								last := nextSeq
-								// 第一个元素就是next，因此从1开始
-								for k := 1; k < len(cp.path); k++ {
-									node := cp.path[k]
-									if !canAddNodeToPath(node, newPath, &newConcat) {
-										break
-									}
-									newPath = append(newPath, node)
-									newConcat += (*node.sequence)[last.next.sfxLen:]
-									last = node
-								}
-								// 添加完毕，加入到结果集
-								newCp := &calculatedPath{
-									path:   newPath,
-									concat: &newConcat,
-								}
-								calculatedPaths = append(calculatedPaths, newCp)
-							}
-							usedOldResult = true
-							continue
-						}
-
-						// 还没遍历过这个节点，加入到广度遍历队列中
-						noNextAdd = false
-						newArg := &bfsArg{
-							seq3:   nextSeq,
-							concat: &nextConcat,
-							path:   nextPath,
-						}
-						bfsQueue.Put(newArg)
-					}
-				}
-			}
-
-			// 若是没有加入后面的节点，且没有使用到后面节点的已经算好的结果，则说明本节点是终点，加入本路径到结果集
-			if noNextAdd && !usedOldResult {
-				cp := &calculatedPath{
-					path:   arg.path,
-					concat: arg.concat,
-				}
-				calculatedPaths = append(seq.calculatedPaths, cp)
-			}
-			item, ok, _ = bfsQueue.Get()
-		}
-		return calculatedPaths
-	}
-
-	if seq.calculatedPaths == nil {
-		seq.calculatedPathLock.Lock()
-		if seq.calculatedPaths == nil {
-			// 实际计算路径
-			paths := doBFS(seq, ctx, queueInitialLength)
-			seq.calculatedPaths = paths
-			seq.calculatedPathLock.Unlock()
-		} else {
-			seq.calculatedPathLock.Unlock()
-		}
-	}
-
-	ret := make([]*string, 0, len(seq.calculatedPaths))
-	for i := 0; i < len(seq.calculatedPaths); i++ {
-		ret = append(ret, seq.calculatedPaths[i].concat)
-	}
-
-	return ret
-}
-
 func ConcatV3(sequences []string, minimumLength int) *string {
 	ctx := &context3{
 		nodes:    sync.Map{},
@@ -485,7 +298,7 @@ func ConcatV3(sequences []string, minimumLength int) *string {
 
 	fmt.Println("构建前缀表...")
 	done := make(chan bool, runtime.NumCPU()*10)
-	progressBar(0, len(sequences), true)
+	ProgressBar(0, len(sequences), PROGRESS_BEGIN)
 	// 构建前缀表
 	for i := 0; i < len(sequences); i++ {
 		done <- true
@@ -494,11 +307,11 @@ func ConcatV3(sequences []string, minimumLength int) *string {
 			insertPrefix(&sequences[index], ctx)
 			<-done
 			atomic.AddInt64(&doneCnt, 1)
-			progressBar(int(doneCnt), len(sequences), false)
+			ProgressBar(int(doneCnt), len(sequences), PROGRESS_UPDATE)
 		}(i)
 	}
 	ctx.wg.Wait()
-	fmt.Println()
+	ProgressBar(0, 0, PROGRESS_FINISH)
 
 	fmt.Println("根据前缀表连接节点...")
 	fmt.Print("已完成 0 个节点")
@@ -531,28 +344,69 @@ func ConcatV3(sequences []string, minimumLength int) *string {
 	})
 	fmt.Println(nodeCnt, "条")
 
+	//fmt.Print("移除子字符串，已删除: 0")
+	//doneCnt = 0
+	//fmtLock := sync.Mutex{}
+	//ctx.nodes.Range(func(key, value interface{}) bool {
+	//	ctx.wg.Add(1)
+	//	seq3 := key.(*sequence3)
+	//	go func(seq *sequence3) {
+	//		defer func() {
+	//			atomic.AddInt64(&doneCnt, 1)
+	//			fmtLock.Lock()
+	//			fmt.Printf("\r移除子字符串，已删除: %d", doneCnt)
+	//			fmtLock.Unlock()
+	//			ctx.wg.Done()
+	//		}()
+	//		ctx.nodes.Range(func(key, value interface{}) bool {
+	//			s2 := key.(*sequence3)
+	//			if s2 == seq3 {
+	//				return true
+	//			}
+	//			if strings.Contains(*seq3.sequence, *s2.sequence) {
+	//				atomic.AddInt64(&doneCnt, 1)
+	//				ctx.nodes.Delete(s2)
+	//			} else if strings.Contains(*s2.sequence, *seq3.sequence) {
+	//				ctx.nodes.Delete(seq3)
+	//				atomic.AddInt64(&doneCnt, 1)
+	//				return false
+	//			}
+	//			return true
+	//		})
+	//	}(seq3)
+	//	return true
+	//})
+	//ctx.wg.Wait()
+	//fmt.Println()
+
+	//fmt.Print("计算剩余字符串数量...")
+	//nodeCnt = 0
+	//ctx.nodes.Range(func(key, value interface{}) bool {
+	//	nodeCnt++
+	//	return true
+	//})
+	//fmt.Println(nodeCnt, "条")
+
 	doneCnt = 0
 	{
 		fmt.Println("广度遍历连接...")
-		progressBar(0, nodeCnt, true)
+		ProgressBar(0, nodeCnt, PROGRESS_BEGIN)
 	}
 	distinctResults := make([]*string, 0)
 	drRWLock := sync.RWMutex{}
 	longestResult := 0
 	lrLock := sync.Mutex{}
 	ctx.nodes.Range(func(key, value interface{}) bool {
-		done <- true
 		keySeq := key.(*sequence3)
 		ctx.wg.Add(1)
 		go func(seq *sequence3) {
 			defer func() {
 				ctx.wg.Done()
-				<-done
 				atomic.AddInt64(&doneCnt, 1)
-				progressBar(int(doneCnt), nodeCnt, false)
+				ProgressBar(int(doneCnt), nodeCnt, PROGRESS_UPDATE)
 			}()
 
-			result := breathFirstSearchV2(seq, ctx, uint64(nodeCnt/4))
+			result := breathFirstSearch(seq, ctx, uint64(nodeCnt/4))
 			{
 				lrLock.Lock()
 				for i := 0; i < len(result); i++ {
@@ -608,10 +462,10 @@ func ConcatV3(sequences []string, minimumLength int) *string {
 		return true
 	})
 	ctx.wg.Wait()
-	fmt.Println()
+	ProgressBar(0, 0, PROGRESS_FINISH)
 
 	fmt.Println("连接完成，得到结果", len(distinctResults), "条，检查结果正确性...")
-	progressBar(0, len(distinctResults), true)
+	ProgressBar(0, len(distinctResults), PROGRESS_BEGIN)
 	doneCnt = 0
 	// 验证结果
 	for i := 0; i < len(distinctResults); i++ {
@@ -620,7 +474,7 @@ func ConcatV3(sequences []string, minimumLength int) *string {
 			defer ctx.wg.Done()
 			defer func() {
 				atomic.AddInt64(&doneCnt, 1)
-				progressBar(int(doneCnt), len(distinctResults), false)
+				ProgressBar(int(doneCnt), len(distinctResults), PROGRESS_UPDATE)
 			}()
 			for j := 0; j < len(sequences); j++ {
 				if !strings.Contains(*distinctResults[index], sequences[j]) {
@@ -632,7 +486,7 @@ func ConcatV3(sequences []string, minimumLength int) *string {
 		}(i)
 	}
 	ctx.wg.Wait()
-	fmt.Println()
+	ProgressBar(0, 0, PROGRESS_FINISH)
 
 	// 删除不符合的
 	retCnt := 0

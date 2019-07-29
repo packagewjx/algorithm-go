@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"github.com/packagewjx/algorithm-go/concat"
 	"math"
 	"os"
@@ -33,6 +32,11 @@ func main() {
 		sequences = append(sequences, s)
 		s, e = reader.ReadString('\n')
 	}
+	file.Close()
 
-	fmt.Println(*concat.ConcatV3(sequences, minLen))
+	result := concat.ConcatV4(sequences)
+
+	file, _ = os.Create("output.txt")
+	file.WriteString(*result)
+	file.Close()
 }
