@@ -21,7 +21,7 @@ func stonePileTake(piles []int, M int, X int, start int) (thisTake, newM int) {
 	return
 }
 
-var memo = make(map[string]*memos)
+var stoneGameMemo = make(map[string]*memos)
 
 type memos struct {
 	take int
@@ -29,7 +29,7 @@ type memos struct {
 	newM int
 }
 
-func dp(piles []int, start int, M int, meFirst bool) (take, x, newM int) {
+func stoneGameIIDP(piles []int, start int, M int, meFirst bool) (take, x, newM int) {
 	if start < 0 || start >= len(piles) {
 		return 0, 0, M
 	}
@@ -40,12 +40,12 @@ func dp(piles []int, start int, M int, meFirst bool) (take, x, newM int) {
 	}
 
 	key := strconv.Itoa(start) + ":" + strconv.Itoa(upperBound)
-	val, ok := memo[key]
+	val, ok := stoneGameMemo[key]
 	if ok {
 		if meFirst {
 			return val.take, val.x, val.newM
 		} else {
-			return dp(piles, start+val.x, val.newM, false)
+			return stoneGameIIDP(piles, start+val.x, val.newM, false)
 		}
 	}
 
@@ -57,7 +57,7 @@ func dp(piles []int, start int, M int, meFirst bool) (take, x, newM int) {
 	if meFirst {
 		for i := 1; i <= upperBound; i++ {
 			thisTake, m := stonePileTake(piles, M, i, start)
-			iTake, _, _ := dp(piles, start+i, m, false)
+			iTake, _, _ := stoneGameIIDP(piles, start+i, m, false)
 			totalTake := thisTake + iTake
 			if totalTake > biggest.take {
 				biggest.take = totalTake
@@ -66,20 +66,20 @@ func dp(piles []int, start int, M int, meFirst bool) (take, x, newM int) {
 			}
 		}
 	} else {
-		_, x2, m2 := dp(piles, start, M, true)
-		i, x3, m3 := dp(piles, start+x2, m2, true)
+		_, x2, m2 := stoneGameIIDP(piles, start, M, true)
+		i, x3, m3 := stoneGameIIDP(piles, start+x2, m2, true)
 		biggest.take = i
 		biggest.x = x3
 		biggest.newM = m3
 	}
 	if meFirst {
-		memo[key] = &biggest
+		stoneGameMemo[key] = &biggest
 	}
 
 	return biggest.take, biggest.x, biggest.newM
 }
 
 func stoneGameII(piles []int) int {
-	take, _, _ := dp(piles, 0, 1, true)
+	take, _, _ := stoneGameIIDP(piles, 0, 1, true)
 	return take
 }
