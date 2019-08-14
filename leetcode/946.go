@@ -1,32 +1,38 @@
 package leetcode
 
+type stack struct {
+	arr []int
+}
+
+func (s *stack) push(num int) {
+	s.arr = append(s.arr, num)
+}
+
+func (s *stack) pop() int {
+	temp := s.arr[len(s.arr)-1]
+	s.arr = s.arr[:len(s.arr)-1]
+	return temp
+}
+
+func (s *stack) isEmpty() bool {
+	return len(s.arr) == 0
+}
+
+func (s *stack) peek() int {
+	return s.arr[len(s.arr)-1]
+}
+
 func validateStackSequences(pushed []int, popped []int) bool {
-	stack := make([]int, 0, 10)
-	exist := make(map[int]bool)
-	deleted := make(map[int]bool)
-	pushedCnt := 0
-	for i := 0; i < len(popped); i++ {
-		if deleted[popped[i]] {
-			continue
-		}
-		pop := popped[i]
-		for ; pushedCnt < len(pushed) && pushed[pushedCnt] != pop; pushedCnt++ {
-			stack = append(stack, pushed[pushedCnt])
-			exist[pushed[pushedCnt]] = true
-		}
-		pushedCnt++
-		deleted[pop] = true
-		for j := i + 1; len(stack) > 0 && j < len(popped); j++ {
-			if exist[popped[j]] && stack[len(stack)-1] == popped[j] {
-				stack = stack[0 : len(stack)-1]
-				exist[popped[j]] = false
-				deleted[popped[j]] = true
+	st := &stack{arr: make([]int, 0, len(pushed)/2)}
+	popIndex := 0
+	for i := 0; i < len(pushed); i++ {
+		st.push(pushed[i])
+		for ; popIndex < len(popped); popIndex++ {
+			if st.isEmpty() || st.peek() != popped[popIndex] {
+				break
 			}
-		}
-		// 到这里应该为空
-		if len(stack) != 0 {
-			return false
+			st.pop()
 		}
 	}
-	return true
+	return popIndex == len(popped)
 }
