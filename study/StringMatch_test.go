@@ -54,7 +54,7 @@ func TestBoyerMooreMatcher_Match(t *testing.T) {
 func TestReverseString(t *testing.T) {
 	fun := func(text, expected string) {
 		result := reverseString(text)
-		testutils.AssertTrue(result == expected, fmt.Sprintf("原串：%s，输出：%s，应该为：%s"), t)
+		testutils.AssertTrue(result == expected, fmt.Sprintf("原串：%s，输出：%s，应该为：%s", text, result, expected), t)
 	}
 
 	fun("ABC", "CBA")
