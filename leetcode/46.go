@@ -11,7 +11,7 @@ func reverseSlice(slice []int) {
 /**
 生成permute的下一个字典序排列。返回是否还有下一个，如果有，permute将会是新的下一个，如果没有，则permute不变
 */
-func nextPermutation(permute []int) bool {
+func nextPermutation46(permute []int) bool {
 	pos := len(permute) - 1
 	for ; pos >= 1 && permute[pos] < permute[pos-1]; pos-- {
 	}
@@ -54,7 +54,7 @@ func permute(nums []int) [][]int {
 			result[i] = nums[permutation[i]]
 		}
 		ret = append(ret, result)
-		hasNext = nextPermutation(permutation)
+		hasNext = nextPermutation46(permutation)
 	}
 	return ret
 }
