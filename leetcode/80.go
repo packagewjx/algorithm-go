@@ -1,6 +1,6 @@
 package leetcode
 
-func removeDuplicates(nums []int) int {
+func removeDuplicates80(nums []int) int {
 	if len(nums) == 0 {
 		return 0
 	}
