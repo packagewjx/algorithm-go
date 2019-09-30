@@ -1,3 +1,5 @@
+//+build leetcode10
+
 package leetcode
 
 func isMatchDP(s string, p string, si, pi int, memo [][]*bool) bool {
