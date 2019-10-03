@@ -1,5 +1,3 @@
-//+build 44dp
-
 package leetcode
 
 const (
