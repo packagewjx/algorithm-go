@@ -1,3 +1,5 @@
+//+build 264tp
+
 package leetcode
 
 func min3Num(n1, n2, n3 int) int {
