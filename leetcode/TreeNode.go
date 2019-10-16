@@ -99,7 +99,7 @@ func newTreeArray(treeString string) (*treeArray, error) {
 	}
 	treeString = strings.TrimSpace(treeString)
 	// 数组表达式，检测是否符合
-	matched, err := regexp.MatchString("^\\[((\\d+|null),)*(\\d+|null)]$", treeString)
+	matched, err := regexp.MatchString("^\\[((-?\\d+|null),)*(-?\\d+|null)]$", treeString)
 	if err != nil {
 		return nil, err
 	}
