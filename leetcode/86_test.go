@@ -1,3 +1,5 @@
+//+build 86
+
 package leetcode
 
 import (
