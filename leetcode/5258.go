@@ -29,27 +29,31 @@ func maxScoreWords(words []string, letters []byte, score []int) int {
 	}
 
 	max := 0
-	var bt func(curScore int)
-	bt = func(curScore int) {
-		for i := 0; i < len(words); i++ {
-			if canUse(i, letterMap) {
-				for j := 'a'; j <= 'z'; j++ {
-					letterMap[j] -= wordLetterMap[i][j]
-				}
-				curScore += wordScore[i]
-				bt(curScore)
-				// 复原
-				for j := 'a'; j <= 'z'; j++ {
-					letterMap[j] += wordLetterMap[i][j]
-				}
-				curScore -= wordScore[i]
+	var bt func(curScore int, pos int)
+	bt = func(curScore int, pos int) {
+		if pos == len(words) {
+			if curScore > max {
+				max = curScore
 			}
+			return
 		}
-		if max < curScore {
-			max = curScore
+		// 用的情况
+		if canUse(pos, letterMap) {
+			for j := 'a'; j <= 'z'; j++ {
+				letterMap[j] -= wordLetterMap[pos][j]
+			}
+			curScore += wordScore[pos]
+			bt(curScore, pos+1)
+			// 复原
+			for j := 'a'; j <= 'z'; j++ {
+				letterMap[j] += wordLetterMap[pos][j]
+			}
+			curScore -= wordScore[pos]
 		}
+		// 不用的情况
+		bt(curScore, pos+1)
 	}
-	bt(0)
+	bt(0, 0)
 
 	return max
 }
