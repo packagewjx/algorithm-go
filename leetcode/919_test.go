@@ -1,3 +1,5 @@
+//+build 919
+
 package leetcode
 
 import "testing"
