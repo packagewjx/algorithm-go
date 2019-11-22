@@ -2,9 +2,8 @@ package leetcode
 
 import "math"
 
-const max = math.MaxInt32 / 10
-
 func myAtoi(str string) int {
+	const max = math.MaxInt32 / 10
 	negative := false
 	cur := 0
 	for ; cur < len(str) && str[cur] == ' '; cur++ {
